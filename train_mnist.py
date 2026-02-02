@@ -57,7 +57,7 @@ print(f'Dropout: {args.dropout}')
 # Hyperparameters
 batch_size = 64
 learning_rate = 0.001
-num_epochs = 10
+num_epochs = 2
 val_split = 0.2
 
 # Data loading and preprocessing
