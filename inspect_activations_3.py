@@ -4,7 +4,7 @@ from transformers import GPT2Tokenizer, GPT2LMHeadModel
 import matplotlib.pyplot as plt
 
 # Load GPT-2 model and tokenizer
-model = GPT2LMHeadModel.from_pretrained('gpt2')
+model = GPT2LMHeadModel.from_pretrained('gpt2', output_attentions=True)
 tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
 
 # Set model to evaluation mode
@@ -31,7 +31,7 @@ print()
 
 # Forward pass with output_attentions=True
 with torch.no_grad():
-    outputs = model(input_ids, output_attentions=True)
+    outputs = model(input_ids)
     attentions = outputs.attentions
 
 print("=" * 80)
