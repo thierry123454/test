@@ -91,3 +91,110 @@ print()
 completed_text = prompt + greedy_token_str
 print("Completed text with greedy token:")
 print(f"'{completed_text}'")
+print()
+
+# ===== CONTINUATION SCORING =====
+print("=" * 80)
+print("CONTINUATION SCORING")
+print("=" * 80)
+print()
+
+def score_continuation(prompt, continuation):
+    """
+    Compute the total log probability of a continuation given a prompt.
+    
+    Args:
+        prompt: The conditioning text (string)
+        continuation: The text to score (string)
+    
+    Returns:
+        float: Total log probability of the continuation
+    """
+    # Tokenize prompt and full text (prompt + continuation)
+    prompt_ids = tokenizer.encode(prompt, return_tensors='pt')
+    full_text = prompt + continuation
+    full_ids = tokenizer.encode(full_text, return_tensors='pt')
+    
+    # Get the continuation tokens (everything after the prompt)
+    continuation_length = full_ids.shape[1] - prompt_ids.shape[1]
+    
+    if continuation_length <= 0:
+        return 0.0  # No continuation to score
+    
+    # Forward pass on the full sequence
+    with torch.no_grad():
+        outputs = model(full_ids)
+        logits = outputs.logits  # Shape: (1, seq_len, vocab_size)
+    
+    # Compute log probabilities for each position
+    log_probs = F.log_softmax(logits, dim=-1)  # Shape: (1, seq_len, vocab_size)
+    
+    # Sum log probabilities for continuation tokens
+    total_log_prob = 0.0
+    
+    # For each token in the continuation, get its log probability
+    # Note: logits[0, i] predicts token at position i+1
+    for i in range(continuation_length):
+        position = prompt_ids.shape[1] + i - 1  # Position in logits that predicts this token
+        token_id = full_ids[0, prompt_ids.shape[1] + i].item()  # The actual token
+        token_log_prob = log_probs[0, position, token_id].item()
+        total_log_prob += token_log_prob
+    
+    return total_log_prob
+
+
+# Example: Compare two continuations
+test_prompt = "The capital of France is"
+continuation1 = " Paris"
+continuation2 = " London"
+
+print(f"Prompt: '{test_prompt}'")
+print()
+
+score1 = score_continuation(test_prompt, continuation1)
+score2 = score_continuation(test_prompt, continuation2)
+
+print(f"Continuation 1: '{continuation1}'")
+print(f"  Total log probability: {score1:.4f}")
+print(f"  Perplexity: {torch.exp(torch.tensor(-score1 / len(tokenizer.encode(continuation1)))).item():.4f}")
+print()
+
+print(f"Continuation 2: '{continuation2}'")
+print(f"  Total log probability: {score2:.4f}")
+print(f"  Perplexity: {torch.exp(torch.tensor(-score2 / len(tokenizer.encode(continuation2)))).item():.4f}")
+print()
+
+if score1 > score2:
+    print(f"✓ Model prefers: '{continuation1}' (higher log probability)")
+    print(f"  Difference: {score1 - score2:.4f} log probability units")
+elif score2 > score1:
+    print(f"✓ Model prefers: '{continuation2}' (higher log probability)")
+    print(f"  Difference: {score2 - score1:.4f} log probability units")
+else:
+    print("Model is indifferent (equal log probabilities)")
+
+print()
+print("=" * 80)
+print("ADDITIONAL EXAMPLES")
+print("=" * 80)
+print()
+
+# More examples
+examples = [
+    ("The sky is", [" blue", " green", " purple"]),
+    ("I love to eat", [" pizza", " rocks", " delicious food"]),
+    ("The president of the United States is", [" elected", " appointed", " chosen by lottery"]),
+]
+
+for prompt_ex, continuations in examples:
+    print(f"Prompt: '{prompt_ex}'")
+    scores = []
+    for cont in continuations:
+        score = score_continuation(prompt_ex, cont)
+        scores.append((cont, score))
+        print(f"  '{cont}': {score:.4f}")
+    
+    # Find the best continuation
+    best_cont, best_score = max(scores, key=lambda x: x[1])
+    print(f"  → Model prefers: '{best_cont}'")
+    print()
